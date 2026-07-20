@@ -1,25 +1,18 @@
 # Neuracade EEG Dashboard
 
-A local Web Serial dashboard for your 8-channel ADS1299/ESP32 stream, built to fix the
-hang/slowdown you were hitting when combining multiple live plots with signal analysis.
+A local Web Serial dashboard for the 8-channel ADS1299/ESP32 stream, built to fix the
+hang/slowdown we were hitting when combining multiple live plots with signal analysis.
 
 ## Files
 - `index.html` — page shell, tabs, layout
 - `worker-bridge.js` — all main-thread logic: serial I/O, ring buffers, uPlot rendering, CSV export
 - `worker.js` — a real Web Worker: FFT (radix-2 Cooley-Tukey), Welch PSD, SFDR, band power
 
-## Why it was hanging before (and what changed)
-
-Your `index.html` used Chart.js and called `chart.update()` synchronously inside the serial
-read loop, once per incoming line. That's fine with one chart. With 8 small charts + a
-combined chart + FFT math in the same place, each incoming sample was forcing multiple
-re-renders and Chart.js re-layouts per line at 250–500 Hz — the main thread never catches up
-and the tab appears to freeze.
 
 This version (closer to your `index2.html` approach, extended) fixes that with three
 separations:
 
-1. **Read ≠ Draw.** The serial read loop only writes floats into `Float32Array` ring
+1. **Read aint Draw.** The serial read loop only writes floats into `Float32Array` ring
    buffers. It never calls into a chart.
 2. **Draw loop is throttled and tab-aware.** A single `requestAnimationFrame` loop, capped
    at 30fps, redraws only the plots on the *currently visible* tab. Switching to the
@@ -67,7 +60,7 @@ already see in the Arduino IDE / your existing `index.html` will appear.
   validated classifier — you'll likely want to add baseline normalization and trial epoching
   once you get to real motor-imagery experiments.
 
-## Tuning for your hardware
+## Tuning for hardware
 
 - Set **Sample rate (Hz)** to match your ADS1299 config (your `fft_check.py` uses 250) before
   connecting — it sizes the ring buffers (10s of history) and the frequency axis.
@@ -79,7 +72,7 @@ already see in the Arduino IDE / your existing `index.html` will appear.
   timestamp prefixes (same as `fft_check.py`), and also tolerates `name:value` tokens from
   the Arduino IDE 2.x plotter format.
 
-## Next steps you mentioned
+## Next steps
 
 - **Excel export** is done via CSV (double-click any plot, or the header button) — CSV opens
   directly in Excel with no extra tooling required.
