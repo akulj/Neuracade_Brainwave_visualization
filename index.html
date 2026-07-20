@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neuracade — Brainwaves visualisation Dashboard</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uplot@1.6.24/dist/uPlot.min.css">
+<script src="https://cdn.jsdelivr.net/npm/uplot@1.6.24/dist/uPlot.iife.min.js"></script>
+<style>
+  :root{
+    --bg:#0b0e14;
+    --panel:#12161f;
+    --panel-2:#171c27;
+    --line:#232937;
+    --text:#dbe2ef;
+    --dim:#7c8aa5;
+    --accent:#5eead4;   /* signal teal */
+    --accent-2:#f0a868;  /* warm marker */
+    --danger:#e15b5b;
+    --ok:#59c98b;
+    --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  }
+  header{
+    display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+    padding:14px 20px; background:var(--panel); border-bottom:1px solid var(--line);
+    position:sticky; top:0; z-index:10;
+  }
+  header h1{
+    font-size:15px; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--dim); margin:0 18px 0 0; font-weight:600;
+  }
+  header h1 span{color:var(--accent);}
+  .status-dot{width:8px; height:8px; border-radius:50%; background:var(--danger); display:inline-block; margin-right:6px;}
+  .status-dot.on{background:var(--ok); box-shadow:0 0 8px var(--ok);}
+  button{
+    padding:8px 14px; font-size:13px; cursor:pointer; border:1px solid var(--line);
+    border-radius:6px; background:var(--panel-2); color:var(--text); transition:.15s;
+  }
+  button:hover:not(:disabled){border-color:var(--accent); color:var(--accent);}
+  button:disabled{opacity:.4; cursor:not-allowed;}
+  button.primary{background:var(--accent); color:#062b26; border-color:var(--accent); font-weight:600;}
+  button.primary:hover:not(:disabled){color:#062b26; filter:brightness(1.08);}
+  label.field{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--dim);}
+  input[type=number]{
+    width:64px; background:var(--bg); border:1px solid var(--line); color:var(--text);
+    border-radius:4px; padding:4px 6px; font-family:var(--mono); font-size:12px;
+  }
+  .spacer{flex:1;}
+  nav.tabs{display:flex; gap:2px; padding:0 20px; background:var(--panel); border-bottom:1px solid var(--line);}
+  nav.tabs button.tab{
+    background:transparent; border:none; border-bottom:2px solid transparent; border-radius:0;
+    padding:12px 16px; color:var(--dim); font-size:13px;
+  }
+  nav.tabs button.tab.active{color:var(--accent); border-bottom-color:var(--accent);}
+  main{padding:20px; max-width:1400px; margin:0 auto;}
+  .tabpanel{display:none;}
+  .tabpanel.active{display:block;}
+  .grid8{display:grid; grid-template-columns:repeat(auto-fit, minmax(340px,1fr)); gap:14px;}
+  .card{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px;
+  }
+  .card h3{margin:0 0 6px 0; font-size:12px; color:var(--dim); font-weight:600; letter-spacing:.04em;
+    display:flex; justify-content:space-between; align-items:center;}
+  .card h3 input.chname{
+    background:transparent; border:none; color:var(--accent); font-size:12px; font-weight:700;
+    width:110px; text-align:left; padding:0;
+  }
+  .card h3 .val{font-family:var(--mono); color:var(--text); font-size:11px;}
+  .hint{color:var(--dim); font-size:11px; margin-top:6px;}
+  .toolbar{display:flex; gap:10px; align-items:center; margin-bottom:14px; flex-wrap:wrap;}
+  .chan-toggle{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;}
+  .chan-toggle label{
+    display:flex; align-items:center; gap:5px; font-size:12px; padding:5px 9px;
+    border:1px solid var(--line); border-radius:14px; cursor:pointer; user-select:none;
+  }
+  .chan-toggle label.on{border-color:var(--accent); color:var(--accent);}
+  .swatch{width:9px; height:9px; border-radius:50%;}
+  table{width:100%; border-collapse:collapse; font-size:12px;}
+  th,td{text-align:left; padding:7px 8px; border-bottom:1px solid var(--line);}
+  th{color:var(--dim); font-weight:600; font-size:11px; text-transform:uppercase;}
+  td.mono, .mono{font-family:var(--mono);}
+  .bandbar-row{display:grid; grid-template-columns:90px 1fr 60px; align-items:center; gap:8px; margin:6px 0;}
+  .bandbar-track{height:10px; background:var(--bg); border-radius:5px; overflow:hidden; border:1px solid var(--line);}
+  .bandbar-fill{height:100%; background:linear-gradient(90deg, var(--accent), var(--accent-2)); width:0%;}
+  .two-col{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+  @media (max-width:900px){.two-col{grid-template-columns:1fr;}}
+  .asym-readout{font-family:var(--mono); font-size:28px; text-align:center; padding:20px; color:var(--accent);}
+  select{background:var(--bg); border:1px solid var(--line); color:var(--text); border-radius:4px; padding:5px 8px; font-size:12px;}
+  .footer-note{color:var(--dim); font-size:11px; margin-top:24px; line-height:1.6;}
+  a{color:var(--accent);}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Neuracade<span>::EEG</span></h1>
+  <span><span id="statusDot" class="status-dot"></span><span id="statusText" style="font-size:12px;color:var(--dim);">Disconnected</span></span>
+  <button id="connectBtn" class="primary">Connect Serial</button>
+  <button id="disconnectBtn" disabled>Disconnect</button>
+  <button id="pauseBtn" disabled>Pause</button>
+  <label class="field">Baud <input type="number" id="baudInput" value="115200" step="1"></label>
+  <label class="field">Sample rate (Hz) <input type="number" id="fsInput" value="250" step="1"></label>
+  <div class="spacer"></div>
+  <button id="exportAllBtn">Export buffer (CSV)</button>
+</header>
+
+<nav class="tabs">
+  <button class="tab active" data-tab="individual">Individual Channels</button>
+  <button class="tab" data-tab="combined">Combined</button>
+  <button class="tab" data-tab="spectrum">Spectrum &amp; SFDR</button>
+  <button class="tab" data-tab="motor">Motor Imagery</button>
+</nav>
+
+<main>
+
+  <!-- ============ INDIVIDUAL ============ -->
+  <div class="tabpanel active" id="panel-individual">
+    <p class="hint">Each channel renders from its own ring buffer on a throttled draw loop, decoupled from the serial read loop — this is what keeps this tab smooth even while FFT/SFDR run in a background worker. Double-click a plot to export that channel's visible window as CSV.</p>
+    <div class="grid8" id="individualGrid"></div>
+  </div>
+
+  <!-- ============ COMBINED ============ -->
+  <div class="tabpanel" id="panel-combined">
+    <div class="toolbar">
+      <div class="chan-toggle" id="combinedToggle"></div>
+      <button id="exportCombinedBtn">Export combined window (CSV)</button>
+    </div>
+    <div class="card"><div id="combinedPlot"></div></div>
+  </div>
+
+  <!-- ============ SPECTRUM ============ -->
+  <div class="tabpanel" id="panel-spectrum">
+    <div class="toolbar">
+      <div class="chan-toggle" id="spectrumToggle"></div>
+      <label class="field">FFT window (s) <input type="number" id="fftWindowInput" value="5" min="1" max="10" step="1"></label>
+      <label class="field">Update every (ms) <input type="number" id="fftIntervalInput" value="1000" min="200" step="100"></label>
+    </div>
+    <p class="hint">Analysis runs continuously on the selected channels in a Web Worker (Welch PSD, 50% overlap, Hann window) — a true non-realtime FFT batch every interval, which avoids the single-shot non-real-time approach in <code>fft_check.py</code> while still not blocking the UI thread.</p>
+    <div class="grid8" id="spectrumGrid"></div>
+    <div class="card" style="margin-top:14px;">
+      <h3>SFDR (per selected channel)</h3>
+      <table>
+        <thead><tr><th>Channel</th><th>Fundamental (Hz)</th><th>Spur (Hz)</th><th>SFDR (dB)</th></tr></thead>
+        <tbody id="sfdrTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ============ MOTOR IMAGERY ============ -->
+  <div class="tabpanel" id="panel-motor">
+    <p class="hint">Uses the same background analysis as the Spectrum tab. Mu (8–13 Hz) and beta (13–30 Hz) power are the bands most associated with sensorimotor rhythm modulation during motor imagery (event-related desynchronization). Rename channels below (e.g. to C3 / C4) — the mapping is saved locally.</p>
+    <div class="two-col">
+      <div class="card">
+        <h3>Mu / Beta band power — all channels</h3>
+        <div id="motorBands"></div>
+      </div>
+      <div class="card">
+        <h3>Left / Right mu-power asymmetry</h3>
+        <div class="toolbar">
+          <label class="field">Left <select id="asymLeftSel"></select></label>
+          <label class="field">Right <select id="asymRightSel"></select></label>
+        </div>
+        <div class="asym-readout" id="asymReadout">—</div>
+        <p class="hint">Asymmetry = (left − right) / (left + right). Negative values trend toward right-hand imagery desynchronizing C3 more than C4, and vice versa — a common bare-bones motor imagery feature; treat as a starting point, not a validated classifier.</p>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<div class="footer-note">
+  Serial format expected: one line per sample, 8 whitespace/comma separated values (<code>ch1 ch2 ... ch8</code>), matching the Arduino Serial Plotter stream. Lines containing <code>-&gt;</code> (Arduino timestamp prefixes) are stripped automatically. Must be served over <code>http://localhost</code> or <code>https://</code> — Web Serial is blocked on plain <code>file://</code> pages.
+</div>
+
+<script src="worker-bridge.js"></script>
+</body>
+</html>
