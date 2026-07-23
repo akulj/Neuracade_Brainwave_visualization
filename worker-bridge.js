@@ -364,11 +364,6 @@ function drawLoop(ts){
 }
 requestAnimationFrame(drawLoop);
     // spectrum & motor tabs are updated only when worker results arrive —
-    // no per-frame cost there at all.
-  }
-  requestAnimationFrame(drawLoop);
-}
-requestAnimationFrame(drawLoop);
 
 // ==================================================================
 // Channel selection (used by Spectrum + Motor tabs)
