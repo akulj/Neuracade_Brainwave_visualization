@@ -258,7 +258,8 @@ function buildIndividualGrid(){
     grid.appendChild(card);
 
     const holder = card.querySelector(`#indiv-plot-${c}`);
-    const width = Math.max(280, holder.clientWidth || 320);
+    const width = holder.clientWidth > 0 ? holder.clientWidth : 320;
+    
     const chart = new uPlot(baseOpts(width, 140, {
       series: [ {}, { stroke: COLORS[c], width:1.5, points:{show:false} } ],
     }), [xData, displayBuffers[c]], holder);
@@ -332,18 +333,21 @@ window.addEventListener('resize', () => resizeChartsForActiveTab());
 // ==================================================================
 // Draw loop — decoupled from serial reads, throttled, tab-aware
 // ==================================================================
-let lastDraw = 0;
+  
+ let lastDraw = 0;
 let liveValIdx = 0;
 function drawLoop(ts){
-  if(!document.hidden && ts - lastDraw >= FRAME_TIME){
+  if(ts - lastDraw >= FRAME_TIME){
     lastDraw = ts;
 
     if(activeTab === 'individual'){
       for(let c=0;c<CHANNELS;c++){
         updateDisplayBuffer(c);
-        individualCharts[c].setData([xData, displayBuffers[c]], false);
+        if(individualCharts[c]){
+          individualCharts[c].setData(displayBuffers[c], false); // Pass just y-data array since xData is shared or bound
+          individualCharts[c].redraw();
+        }
       }
-      // cheap live readout, no chart cost
       const rb = ringBuffers[liveValIdx % CHANNELS];
       const lastIdx = (rb.writeIndex - 1 + BUFFER_SIZE) % BUFFER_SIZE;
       const el = document.getElementById(`liveval-${liveValIdx % CHANNELS}`);
@@ -351,10 +355,14 @@ function drawLoop(ts){
       liveValIdx++;
     } else if(activeTab === 'combined' && combinedChart){
       for(let c=0;c<CHANNELS;c++) updateDisplayBuffer(c);
+      // Pass the full multi-series array and force a redraw so it updates without needing a button toggle
       combinedChart.setData([xData, ...displayBuffers], false);
-    } else if(activeTab === 'control' && ratioChart){
-      ratioChart.setData([ratioHistX, chronologicalRatioSnapshot()], false);
+      combinedChart.redraw();
     }
+  }
+  requestAnimationFrame(drawLoop);
+}
+requestAnimationFrame(drawLoop);
     // spectrum & motor tabs are updated only when worker results arrive —
     // no per-frame cost there at all.
   }
