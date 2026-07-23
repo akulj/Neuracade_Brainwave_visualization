@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Neuracade — Brainwaves visualisation Dashboard</title>
+<title>Neuracade — EEG Dashboard</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uplot@1.6.24/dist/uPlot.min.css">
 <script src="https://cdn.jsdelivr.net/npm/uplot@1.6.24/dist/uPlot.iife.min.js"></script>
 <style>
@@ -114,6 +114,7 @@
   <button class="tab" data-tab="combined">Combined</button>
   <button class="tab" data-tab="spectrum">Spectrum &amp; SFDR</button>
   <button class="tab" data-tab="motor">Motor Imagery</button>
+  <button class="tab" data-tab="control">Gesture Control</button>
 </nav>
 
 <main>
@@ -171,12 +172,74 @@
     </div>
   </div>
 
+  <!-- ============ GESTURE CONTROL ============ -->
+  <div class="tabpanel" id="panel-control">
+    <p class="hint">
+      Detects movement bursts against a self-adapting noise floor instead of a fixed threshold, so the slowly
+      drifting baseline you're seeing can't cause false triggers or missed detections. Ratio = burst energy ÷
+      recent quiet-baseline energy — it stays near 1 at rest no matter where the raw signal currently sits.
+      <b>Absolute thresholds are hardware/session specific</b>, so calibrate below rather than trusting the
+      defaults: stay still for the baseline step, then perform each movement once, cleanly, when prompted.
+    </p>
+
+    <div class="two-col">
+      <div class="card">
+        <h3>Setup</h3>
+        <div class="toolbar">
+          <label class="field">Control channel <select id="controlChannelSel"></select></label>
+        </div>
+        <div class="toolbar">
+          <label class="field"><input type="checkbox" id="sendCommandsChk"> Write commands to serial port</label>
+        </div>
+        <p class="hint">Commands are written as plain ASCII lines (e.g. <code>close_fist\n</code>) to the same
+          serial connection used for reading, using the port's writable stream — wire your robotic-arm firmware
+          to read lines on this same UART, or split off a second listener on its side.</p>
+
+        <h3 style="margin-top:18px;">Calibration wizard</h3>
+        <div class="toolbar" style="flex-wrap:wrap;">
+          <button id="calibQuietBtn">1. Stay still (5s)</button>
+          <button id="calibToeBtn" disabled>2. Wiggle toes (4s)</button>
+          <button id="calibAnkleBtn" disabled>3. Wiggle ankles (4s)</button>
+          <button id="calibLegBtn" disabled>4. Move leg (4s)</button>
+        </div>
+        <div id="calibStatus" class="hint">Not calibrated yet — using placeholder thresholds below.</div>
+
+        <table style="margin-top:12px;">
+          <thead><tr><th>Tier</th><th>Enter</th><th>Exit</th><th>Command</th></tr></thead>
+          <tbody id="tierTableBody"></tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h3>Live state</h3>
+        <div style="display:flex; gap:18px; align-items:baseline; margin:10px 0;">
+          <div>
+            <div class="hint">State</div>
+            <div id="liveState" class="mono" style="font-size:22px; color:var(--accent);">idle</div>
+          </div>
+          <div>
+            <div class="hint">Ratio</div>
+            <div id="liveRatio" class="mono" style="font-size:22px;">—</div>
+          </div>
+          <div>
+            <div class="hint">Last command</div>
+            <div id="liveCommand" class="mono" style="font-size:22px;">—</div>
+          </div>
+        </div>
+        <div id="ratioPlot"></div>
+        <h3 style="margin-top:16px;">Event log</h3>
+        <div id="eventLog" style="max-height:220px; overflow-y:auto; font-family:var(--mono); font-size:12px; line-height:1.7;"></div>
+      </div>
+    </div>
+  </div>
+
 </main>
 
 <div class="footer-note">
   Serial format expected: one line per sample, 8 whitespace/comma separated values (<code>ch1 ch2 ... ch8</code>), matching the Arduino Serial Plotter stream. Lines containing <code>-&gt;</code> (Arduino timestamp prefixes) are stripped automatically. Must be served over <code>http://localhost</code> or <code>https://</code> — Web Serial is blocked on plain <code>file://</code> pages.
 </div>
 
+<script src="gesture-detector.js"></script>
 <script src="worker-bridge.js"></script>
 </body>
 </html>
