@@ -333,35 +333,37 @@ window.addEventListener('resize', () => resizeChartsForActiveTab());
 // ==================================================================
 // Draw loop — decoupled from serial reads, throttled, tab-aware
 // ==================================================================
-  
- let lastDraw = 0;
+let lastDraw = 0;
 let liveValIdx = 0;
-function drawLoop(ts){
-  if(ts - lastDraw >= FRAME_TIME){
+
+function drawLoop(ts) {
+  if (ts - lastDraw >= FRAME_TIME) {
     lastDraw = ts;
 
-    if(activeTab === 'individual'){
-      for(let c=0;c<CHANNELS;c++){
+    if (activeTab === 'individual') {
+      for (let c = 0; c < CHANNELS; c++) {
         updateDisplayBuffer(c);
-        if(individualCharts[c]){
-          individualCharts[c].setData(displayBuffers[c], false); // Pass just y-data array since xData is shared or bound
+        if (individualCharts[c]) {
+          individualCharts[c].setData(displayBuffers[c], false);
           individualCharts[c].redraw();
         }
       }
       const rb = ringBuffers[liveValIdx % CHANNELS];
       const lastIdx = (rb.writeIndex - 1 + BUFFER_SIZE) % BUFFER_SIZE;
       const el = document.getElementById(`liveval-${liveValIdx % CHANNELS}`);
-      if(el) el.textContent = rb.data[lastIdx].toFixed(2);
+      if (el) el.textContent = rb.data[lastIdx].toFixed(2);
       liveValIdx++;
-    } else if(activeTab === 'combined' && combinedChart){
-      for(let c=0;c<CHANNELS;c++) updateDisplayBuffer(c);
-      // Pass the full multi-series array and force a redraw so it updates without needing a button toggle
+    } else if (activeTab === 'combined' && combinedChart) {
+      for (let c = 0; c < CHANNELS; c++) updateDisplayBuffer(c);
       combinedChart.setData([xData, ...displayBuffers], false);
       combinedChart.redraw();
     }
+    // Spectrum & motor tabs are updated only when worker results arrive —
+    // no per-frame cost there at all.
   }
   requestAnimationFrame(drawLoop);
 }
+
 requestAnimationFrame(drawLoop);
     // spectrum & motor tabs are updated only when worker results arrive —
 
