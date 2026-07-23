@@ -115,6 +115,11 @@ connectBtn.addEventListener('click', async () => {
     const baud = parseInt(document.getElementById('baudInput').value, 10) || 115200;
     await port.open({ baudRate: baud });
 
+    try{ writer = port.writable.getWriter(); }catch(e){ writer = null; }
+    controlSampleIdx = 0;
+    gestureDetector = new GestureDetector({ fs: FS });
+    refreshTierTable();
+
     connectBtn.disabled = true;
     disconnectBtn.disabled = false;
     pauseBtn.disabled = false;
@@ -131,6 +136,8 @@ connectBtn.addEventListener('click', async () => {
 disconnectBtn.addEventListener('click', async () => {
   keepReading = false;
   stopAnalysisTimer();
+  try{ if(writer){ writer.releaseLock(); } }catch(e){}
+  writer = null;
   try{ if(reader){ await reader.cancel(); } }catch(e){}
   try{ if(port){ await port.close(); } }catch(e){}
   connectBtn.disabled = false;
@@ -187,6 +194,15 @@ function parseLine(rawLine){
     values[i] = v;
   }
   for(let i=0;i<CHANNELS;i++) pushSample(i, values[i]);
+
+  // gesture detector runs per-sample here too — it's O(1) work (a few
+  // multiplies), so it costs nothing extra on top of the ring-buffer
+  // writes above, unlike FFT/PSD which is batched in the worker instead.
+  controlSampleIdx++;
+  const controlCh = parseInt(document.getElementById('controlChannelSel').value, 10) || 0;
+  const gResult = gestureDetector.processSample(values[controlCh], (controlSampleIdx / FS) * 1000);
+  pushRatioHistory(gResult.ratio);
+  if(gResult.event) handleGestureEvent(gResult.event);
 }
 
 // ==================================================================
@@ -224,43 +240,6 @@ function baseOpts(width, height, extra){
   }, extra);
 }
 
-// function buildIndividualGrid(){
-//   const grid = document.getElementById('individualGrid');
-//   grid.innerHTML = '';
-//   individualCharts.length = 0;
-
-//   for(let c=0;c<CHANNELS;c++){
-//     const card = document.createElement('div');
-//     card.className = 'card';
-//     card.innerHTML = `
-//       <h3>
-//         <input class="chname" data-ch="${c}" value="${channelNames[c]}">
-//         <span class="val" id="liveval-${c}">—</span>
-//       </h3>
-//       <div id="indiv-plot-${c}"></div>
-//     `;
-//     grid.appendChild(card);
-
-//     const holder = card.querySelector(`#indiv-plot-${c}`);
-//     const width = Math.max(280, holder.clientWidth || 320);
-//     const chart = new uPlot(baseOpts(width, 140, {
-//       series: [ {}, { stroke: COLORS[c], width:1.5, points:{show:false} } ],
-//     }), [xData, displayBuffers[c]], holder);
-//     individualCharts.push(chart);
-
-//     holder.addEventListener('dblclick', () => exportChannelCSV(c));
-//   }
-
-//   grid.querySelectorAll('input.chname').forEach(inp => {
-//     inp.addEventListener('change', () => {
-//       const idx = parseInt(inp.dataset.ch, 10);
-//       channelNames[idx] = inp.value || defaultNames[idx];
-//       saveChannelNames();
-//       refreshChannelSelectors();
-//     });
-//   });
-// }
-
 function buildIndividualGrid(){
   const grid = document.getElementById('individualGrid');
   grid.innerHTML = '';
@@ -274,19 +253,17 @@ function buildIndividualGrid(){
         <input class="chname" data-ch="${c}" value="${channelNames[c]}">
         <span class="val" id="liveval-${c}">—</span>
       </h3>
-      <div id="indiv-plot-${c}" style="width:100%;"></div>
+      <div id="indiv-plot-${c}"></div>
     `;
     grid.appendChild(card);
 
     const holder = card.querySelector(`#indiv-plot-${c}`);
-    // Force a reliable initial width fallback if clientWidth is 0 during rapid load
-    const width = holder.clientWidth > 0 ? holder.clientWidth : 320;
-    
+    const width = Math.max(280, holder.clientWidth || 320);
     const chart = new uPlot(baseOpts(width, 140, {
       series: [ {}, { stroke: COLORS[c], width:1.5, points:{show:false} } ],
     }), [xData, displayBuffers[c]], holder);
-    
     individualCharts.push(chart);
+
     holder.addEventListener('dblclick', () => exportChannelCSV(c));
   }
 
@@ -345,6 +322,9 @@ function resizeChartsForActiveTab(){
   } else if(activeTab === 'combined' && combinedChart){
     const holder = document.getElementById('combinedPlot');
     combinedChart.setSize({ width: holder.clientWidth, height: 420 });
+  } else if(activeTab === 'control' && ratioChart){
+    const holder = document.getElementById('ratioPlot');
+    ratioChart.setSize({ width: holder.clientWidth, height: 160 });
   }
 }
 window.addEventListener('resize', () => resizeChartsForActiveTab());
@@ -355,35 +335,29 @@ window.addEventListener('resize', () => resizeChartsForActiveTab());
 let lastDraw = 0;
 let liveValIdx = 0;
 function drawLoop(ts){
-            if(ts - lastDraw >= FRAME_TIME){
-              lastDraw = ts;
+  if(!document.hidden && ts - lastDraw >= FRAME_TIME){
+    lastDraw = ts;
 
-            if(activeTab === 'individual'){
-
-              for(let c=0;c<CHANNELS;c++){
-
-                  updateDisplayBuffer(c);
-
-                  individualCharts[c].setData([
-                      xData,
-                      displayBuffers[c]
-                  ]);
-
-              }
-
-          }
-          else if(activeTab === 'combined'){
-
-              for(let c=0;c<CHANNELS;c++)
-                  updateDisplayBuffer(c);
-
-              combinedChart.setData([
-                  xData,
-                  ...displayBuffers
-              ]);
-
-          }
-            }
+    if(activeTab === 'individual'){
+      for(let c=0;c<CHANNELS;c++){
+        updateDisplayBuffer(c);
+        individualCharts[c].setData([xData, displayBuffers[c]], false);
+      }
+      // cheap live readout, no chart cost
+      const rb = ringBuffers[liveValIdx % CHANNELS];
+      const lastIdx = (rb.writeIndex - 1 + BUFFER_SIZE) % BUFFER_SIZE;
+      const el = document.getElementById(`liveval-${liveValIdx % CHANNELS}`);
+      if(el) el.textContent = rb.data[lastIdx].toFixed(2);
+      liveValIdx++;
+    } else if(activeTab === 'combined' && combinedChart){
+      for(let c=0;c<CHANNELS;c++) updateDisplayBuffer(c);
+      combinedChart.setData([xData, ...displayBuffers], false);
+    } else if(activeTab === 'control' && ratioChart){
+      ratioChart.setData([ratioHistX, chronologicalRatioSnapshot()], false);
+    }
+    // spectrum & motor tabs are updated only when worker results arrive —
+    // no per-frame cost there at all.
+  }
   requestAnimationFrame(drawLoop);
 }
 requestAnimationFrame(drawLoop);
@@ -600,6 +574,125 @@ document.getElementById('exportAllBtn').addEventListener('click', exportCombined
 document.getElementById('exportCombinedBtn').addEventListener('click', exportCombinedCSV);
 
 // ==================================================================
+// Gesture Control — real-time toe/ankle/leg burst detector
+// ==================================================================
+let writer = null;
+let controlSampleIdx = 0;
+let gestureDetector = new GestureDetector({ fs: FS });
+
+// populate the control-channel dropdown (reuses channel names)
+function refreshControlChannelSelect(){
+  const sel = document.getElementById('controlChannelSel');
+  const prev = sel.value;
+  sel.innerHTML = '';
+  for(let c=0;c<CHANNELS;c++){
+    const o = document.createElement('option');
+    o.value = c; o.textContent = channelNames[c];
+    sel.appendChild(o);
+  }
+  sel.value = prev !== '' ? prev : 0;
+}
+refreshControlChannelSelect();
+const _origRefreshChannelSelectors = refreshChannelSelectors;
+refreshChannelSelectors = function(){ _origRefreshChannelSelectors(); refreshControlChannelSelect(); };
+
+// ---- ratio strip chart (rolling history, downsampled) ----
+const RATIO_HIST_LEN = 300; // ~30s at 10Hz push rate
+const ratioHistX = new Float32Array(RATIO_HIST_LEN);
+const ratioHistY = new Float32Array(RATIO_HIST_LEN);
+for(let i=0;i<RATIO_HIST_LEN;i++) ratioHistX[i] = i;
+let ratioWriteIdx = 0, ratioPushCounter = 0;
+let ratioChart = null;
+
+function buildRatioChart(){
+  const holder = document.getElementById('ratioPlot');
+  holder.innerHTML = '';
+  const width = Math.max(280, holder.clientWidth || 500);
+  ratioChart = new uPlot(baseOpts(width, 160, {
+    scales: { x:{ time:false } },
+    series: [ {}, { stroke: '#5eead4', width:1.5, points:{show:false} } ],
+  }), [ratioHistX, ratioHistY], holder);
+}
+
+function pushRatioHistory(ratio){
+  // downsample to ~10Hz so the chart isn't fed at 250Hz for nothing
+  ratioPushCounter++;
+  const everyN = Math.max(1, Math.round(FS / 10));
+  if(ratioPushCounter % everyN !== 0) return;
+  ratioHistY[ratioWriteIdx] = ratio;
+  ratioWriteIdx = (ratioWriteIdx + 1) % RATIO_HIST_LEN;
+  document.getElementById('liveRatio').textContent = ratio.toFixed(2);
+  document.getElementById('liveState').textContent = gestureDetector.state;
+}
+
+function chronologicalRatioSnapshot(){
+  const out = new Float32Array(RATIO_HIST_LEN);
+  out.set(ratioHistY.subarray(ratioWriteIdx), 0);
+  out.set(ratioHistY.subarray(0, ratioWriteIdx), RATIO_HIST_LEN - ratioWriteIdx);
+  return out;
+}
+
+// ---- event log + command dispatch ----
+function handleGestureEvent(evt){
+  document.getElementById('liveCommand').textContent = evt.command;
+  const log = document.getElementById('eventLog');
+  const row = document.createElement('div');
+  const time = new Date().toLocaleTimeString();
+  row.textContent = `[${time}] ${evt.state.toUpperCase()} → ${evt.command}  (ratio ${evt.ratio.toFixed(2)})`;
+  log.prepend(row);
+  while(log.children.length > 100) log.removeChild(log.lastChild);
+
+  if(document.getElementById('sendCommandsChk').checked && writer){
+    writer.write(new TextEncoder().encode(evt.command + '\n')).catch(err => console.error('write error', err));
+  }
+}
+
+// ---- threshold table ----
+function refreshTierTable(){
+  const body = document.getElementById('tierTableBody');
+  body.innerHTML = '';
+  gestureDetector.tiers.forEach(t => {
+    const row = document.createElement('tr');
+    row.innerHTML = `<td>${t.key}</td><td class="mono">${t.enterRatio.toFixed(2)}</td><td class="mono">${t.exitRatio.toFixed(2)}</td><td class="mono">${t.command}</td>`;
+    body.appendChild(row);
+  });
+}
+refreshTierTable();
+
+// ---- calibration wizard ----
+function setCalibStatus(text){ document.getElementById('calibStatus').textContent = text; }
+
+function runCalibrationStep(tierKey, durationMs, label, nextBtn){
+  const btn = { toe: 'calibToeBtn', ankle: 'calibAnkleBtn', leg: 'calibLegBtn', null: 'calibQuietBtn' }[tierKey ?? 'null'];
+  document.getElementById(btn).disabled = true;
+  let remaining = durationMs;
+  setCalibStatus(`${label}: hold for ${(remaining/1000).toFixed(1)}s...`);
+  const tick = setInterval(() => {
+    remaining -= 100;
+    if(remaining > 0) setCalibStatus(`${label}: hold for ${(remaining/1000).toFixed(1)}s...`);
+  }, 100);
+
+  gestureDetector.startCalibration(tierKey, durationMs).then(result => {
+    clearInterval(tick);
+    if(tierKey === null){
+      setCalibStatus(`Baseline captured (peak ratio while still: ${result.peakRatio}). Now calibrate each movement.`);
+      document.getElementById('calibToeBtn').disabled = false;
+    } else {
+      const app = result.applied;
+      setCalibStatus(`${tierKey} calibrated — peak ratio ${result.peakRatio}, enter=${app.enterRatio}, exit=${app.exitRatio}.`);
+      refreshTierTable();
+      if(nextBtn) document.getElementById(nextBtn).disabled = false;
+    }
+  });
+}
+
+document.getElementById('calibQuietBtn').addEventListener('click', () => runCalibrationStep(null, 5000, 'Stay still'));
+document.getElementById('calibToeBtn').addEventListener('click', () => runCalibrationStep('toe', 4000, 'Wiggle toes', 'calibAnkleBtn'));
+document.getElementById('calibAnkleBtn').addEventListener('click', () => runCalibrationStep('ankle', 4000, 'Wiggle ankles', 'calibLegBtn'));
+document.getElementById('calibLegBtn').addEventListener('click', () => runCalibrationStep('leg', 4000, 'Move leg', null));
+
+// ==================================================================
 // Init
 // ==================================================================
 rebuildAllCharts();
+buildRatioChart();
