@@ -258,8 +258,7 @@ function buildIndividualGrid(){
     grid.appendChild(card);
 
     const holder = card.querySelector(`#indiv-plot-${c}`);
-    const width = holder.clientWidth > 0 ? holder.clientWidth : 320;
-    
+    const width = Math.max(280, holder.clientWidth || 320);
     const chart = new uPlot(baseOpts(width, 140, {
       series: [ {}, { stroke: COLORS[c], width:1.5, points:{show:false} } ],
     }), [xData, displayBuffers[c]], holder);
@@ -637,6 +636,55 @@ function chronologicalRatioSnapshot(){
   return out;
 }
 
+// ---- Wireless hand connection (WebSocket, independent of the EEG serial link) ----
+let handSocket = null;
+let handWantConnected = false; // true unless the user explicitly clicked Disconnect
+let handReconnectTimer = null;
+
+function setHandStatus(connected){
+  document.getElementById('handStatusDot').classList.toggle('on', connected);
+  document.getElementById('handStatusText').textContent = connected ? 'Connected' : 'Disconnected';
+}
+
+function connectHandSocket(){
+  const addr = document.getElementById('handAddressInput').value.trim();
+  if(!addr){ alert('Enter the hand ESP32\'s IP address (or mDNS hostname) first.'); return; }
+
+  handWantConnected = true;
+  document.getElementById('handConnectBtn').disabled = true;
+  document.getElementById('handDisconnectBtn').disabled = false;
+
+  handSocket = new WebSocket(`ws://${addr}:81/`);
+  handSocket.onopen = () => setHandStatus(true);
+  handSocket.onclose = () => {
+    setHandStatus(false);
+    if(handWantConnected){
+      // auto-reconnect — a dropped WiFi link shouldn't require a manual click
+      clearTimeout(handReconnectTimer);
+      handReconnectTimer = setTimeout(connectHandSocket, 2000);
+    }
+  };
+  handSocket.onerror = (err) => console.error('Hand WebSocket error:', err);
+}
+
+function disconnectHandSocket(){
+  handWantConnected = false;
+  clearTimeout(handReconnectTimer);
+  if(handSocket) handSocket.close();
+  document.getElementById('handConnectBtn').disabled = false;
+  document.getElementById('handDisconnectBtn').disabled = true;
+  setHandStatus(false);
+}
+
+function sendHandCommand(cmd){
+  if(handSocket && handSocket.readyState === WebSocket.OPEN){
+    handSocket.send(cmd);
+  }
+}
+
+document.getElementById('handConnectBtn').addEventListener('click', connectHandSocket);
+document.getElementById('handDisconnectBtn').addEventListener('click', disconnectHandSocket);
+
 // ---- event log + command dispatch ----
 function handleGestureEvent(evt){
   document.getElementById('liveCommand').textContent = evt.command;
@@ -647,6 +695,9 @@ function handleGestureEvent(evt){
   log.prepend(row);
   while(log.children.length > 100) log.removeChild(log.lastChild);
 
+  if(document.getElementById('sendWifiChk').checked){
+    sendHandCommand(evt.command);
+  }
   if(document.getElementById('sendCommandsChk').checked && writer){
     writer.write(new TextEncoder().encode(evt.command + '\n')).catch(err => console.error('write error', err));
   }
