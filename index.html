@@ -46,11 +46,10 @@
   button.primary{background:var(--accent); color:#062b26; border-color:var(--accent); font-weight:600;}
   button.primary:hover:not(:disabled){color:#062b26; filter:brightness(1.08);}
   label.field{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--dim);}
-  input[type=number], input[type=text]{
-    background:var(--bg); border:1px solid var(--line); color:var(--text);
+  input[type=number]{
+    width:64px; background:var(--bg); border:1px solid var(--line); color:var(--text);
     border-radius:4px; padding:4px 6px; font-family:var(--mono); font-size:12px;
   }
-  input[type=number]{width:64px;}
   .spacer{flex:1;}
   nav.tabs{display:flex; gap:2px; padding:0 20px; background:var(--panel); border-bottom:1px solid var(--line);}
   nav.tabs button.tab{
@@ -121,67 +120,9 @@
 <main>
 
   <!-- ============ INDIVIDUAL ============ -->
-<!-- ============ INDIVIDUAL ============ -->
   <div class="tabpanel active" id="panel-individual">
     <p class="hint">Each channel renders from its own ring buffer on a throttled draw loop, decoupled from the serial read loop — this is what keeps this tab smooth even while FFT/SFDR run in a background worker. Double-click a plot to export that channel's visible window as CSV.</p>
-    <div class="grid8" id="individualGrid">
-      <div class="card">
-        <h3>
-          <input class="chname" data-ch="0" value="CH1">
-          <span class="val" id="liveval-0">—</span>
-        </h3>
-        <div id="indiv-plot-0"></div>
-      </div>
-      <div class="card">
-        <h3>
-          <input class="chname" data-ch="1" value="CH2">
-          <span class="val" id="liveval-1">—</span>
-        </h3>
-        <div id="indiv-plot-1"></div>
-      </div>
-      <div class="card">
-        <h3>
-          <input class="chname" data-ch="2" value="CH3">
-          <span class="val" id="liveval-2">—</span>
-        </h3>
-        <div id="indiv-plot-2"></div>
-      </div>
-      <div class="card">
-        <h3>
-          <input class="chname" data-ch="3" value="CH4">
-          <span class="val" id="liveval-3">—</span>
-        </h3>
-        <div id="indiv-plot-3"></div>
-      </div>
-      <div class="card">
-        <h3>
-          <input class="chname" data-ch="4" value="CH5">
-          <span class="val" id="liveval-4">—</span>
-        </h3>
-        <div id="indiv-plot-4"></div>
-      </div>
-      <div class="card">
-        <h3>
-          <input class="chname" data-ch="5" value="CH6">
-          <span class="val" id="liveval-5">—</span>
-        </h3>
-        <div id="indiv-plot-5"></div>
-      </div>
-      <div class="card">
-        <h3>
-          <input class="chname" data-ch="6" value="CH7">
-          <span class="val" id="liveval-6">—</span>
-        </h3>
-        <div id="indiv-plot-6"></div>
-      </div>
-      <div class="card">
-        <h3>
-          <input class="chname" data-ch="7" value="CH8">
-          <span class="val" id="liveval-7">—</span>
-        </h3>
-        <div id="indiv-plot-7"></div>
-      </div>
-    </div>
+    <div class="grid8" id="individualGrid"></div>
   </div>
 
   <!-- ============ COMBINED ============ -->
@@ -247,22 +188,12 @@
         <div class="toolbar">
           <label class="field">Control channel <select id="controlChannelSel"></select></label>
         </div>
-
-        <h3 style="margin-top:18px;">Wireless hand (recommended)</h3>
-        <p class="hint">Keeps hand commands off the EEG's serial link entirely — no shared-port contention. Set up a DHCP reservation for the hand ESP32's MAC address in your router so this IP never changes.</p>
         <div class="toolbar">
-          <label class="field">Hand address <input type="text" id="handAddressInput" placeholder="192.168.1.50" style="width:140px;"></label>
-          <button id="handConnectBtn">Connect</button>
-          <button id="handDisconnectBtn" disabled>Disconnect</button>
-          <span><span id="handStatusDot" class="status-dot"></span><span id="handStatusText" style="font-size:12px;color:var(--dim);">Disconnected</span></span>
+          <label class="field"><input type="checkbox" id="sendCommandsChk"> Write commands to serial port</label>
         </div>
-        <label class="field" style="margin-top:6px;"><input type="checkbox" id="sendWifiChk" checked> Send gesture commands over Wi-Fi</label>
-
-        <h3 style="margin-top:18px;">Serial fallback (not recommended alongside high-rate EEG streaming)</h3>
-        <div class="toolbar">
-          <label class="field"><input type="checkbox" id="sendCommandsChk"> Also write commands to the EEG serial port</label>
-        </div>
-        <p class="hint">Writes ASCII command lines (e.g. <code>close_fist\n</code>) back down the same serial connection used to read EEG data.</p>
+        <p class="hint">Commands are written as plain ASCII lines (e.g. <code>close_fist\n</code>) to the same
+          serial connection used for reading, using the port's writable stream — wire your robotic-arm firmware
+          to read lines on this same UART, or split off a second listener on its side.</p>
 
         <h3 style="margin-top:18px;">Calibration wizard</h3>
         <div class="toolbar" style="flex-wrap:wrap;">
