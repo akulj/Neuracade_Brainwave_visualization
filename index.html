@@ -46,10 +46,11 @@
   button.primary{background:var(--accent); color:#062b26; border-color:var(--accent); font-weight:600;}
   button.primary:hover:not(:disabled){color:#062b26; filter:brightness(1.08);}
   label.field{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--dim);}
-  input[type=number]{
-    width:64px; background:var(--bg); border:1px solid var(--line); color:var(--text);
+  input[type=number], input[type=text]{
+    background:var(--bg); border:1px solid var(--line); color:var(--text);
     border-radius:4px; padding:4px 6px; font-family:var(--mono); font-size:12px;
   }
+  input[type=number]{width:64px;}
   .spacer{flex:1;}
   nav.tabs{display:flex; gap:2px; padding:0 20px; background:var(--panel); border-bottom:1px solid var(--line);}
   nav.tabs button.tab{
@@ -190,8 +191,7 @@
         </div>
 
         <h3 style="margin-top:18px;">Wireless hand (recommended)</h3>
-        <p class="hint">Keeps hand commands off the EEG's serial link entirely — no shared-port contention.
-          Set up a DHCP reservation for the hand ESP32's MAC address in your router so this IP never changes.</p>
+        <p class="hint">Keeps hand commands off the EEG's serial link entirely — no shared-port contention. Set up a DHCP reservation for the hand ESP32's MAC address in your router so this IP never changes.</p>
         <div class="toolbar">
           <label class="field">Hand address <input type="text" id="handAddressInput" placeholder="192.168.1.50" style="width:140px;"></label>
           <button id="handConnectBtn">Connect</button>
@@ -204,10 +204,7 @@
         <div class="toolbar">
           <label class="field"><input type="checkbox" id="sendCommandsChk"> Also write commands to the EEG serial port</label>
         </div>
-        <p class="hint">Writes ASCII command lines (e.g. <code>close_fist\n</code>) back down the same serial
-          connection used to read EEG data. Fine for bench testing one command at a time, but sharing that link
-          with continuous high-rate ADC streaming is exactly the kind of contention the Wi-Fi path above avoids —
-          prefer Wi-Fi once it's working.</p>
+        <p class="hint">Writes ASCII command lines (e.g. <code>close_fist\n</code>) back down the same serial connection used to read EEG data.</p>
 
         <h3 style="margin-top:18px;">Calibration wizard</h3>
         <div class="toolbar" style="flex-wrap:wrap;">
