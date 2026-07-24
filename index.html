@@ -188,12 +188,26 @@
         <div class="toolbar">
           <label class="field">Control channel <select id="controlChannelSel"></select></label>
         </div>
+
+        <h3 style="margin-top:18px;">Wireless hand (recommended)</h3>
+        <p class="hint">Keeps hand commands off the EEG's serial link entirely — no shared-port contention.
+          Set up a DHCP reservation for the hand ESP32's MAC address in your router so this IP never changes.</p>
         <div class="toolbar">
-          <label class="field"><input type="checkbox" id="sendCommandsChk"> Write commands to serial port</label>
+          <label class="field">Hand address <input type="text" id="handAddressInput" placeholder="192.168.1.50" style="width:140px;"></label>
+          <button id="handConnectBtn">Connect</button>
+          <button id="handDisconnectBtn" disabled>Disconnect</button>
+          <span><span id="handStatusDot" class="status-dot"></span><span id="handStatusText" style="font-size:12px;color:var(--dim);">Disconnected</span></span>
         </div>
-        <p class="hint">Commands are written as plain ASCII lines (e.g. <code>close_fist\n</code>) to the same
-          serial connection used for reading, using the port's writable stream — wire your robotic-arm firmware
-          to read lines on this same UART, or split off a second listener on its side.</p>
+        <label class="field" style="margin-top:6px;"><input type="checkbox" id="sendWifiChk" checked> Send gesture commands over Wi-Fi</label>
+
+        <h3 style="margin-top:18px;">Serial fallback (not recommended alongside high-rate EEG streaming)</h3>
+        <div class="toolbar">
+          <label class="field"><input type="checkbox" id="sendCommandsChk"> Also write commands to the EEG serial port</label>
+        </div>
+        <p class="hint">Writes ASCII command lines (e.g. <code>close_fist\n</code>) back down the same serial
+          connection used to read EEG data. Fine for bench testing one command at a time, but sharing that link
+          with continuous high-rate ADC streaming is exactly the kind of contention the Wi-Fi path above avoids —
+          prefer Wi-Fi once it's working.</p>
 
         <h3 style="margin-top:18px;">Calibration wizard</h3>
         <div class="toolbar" style="flex-wrap:wrap;">
