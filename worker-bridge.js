@@ -647,7 +647,7 @@ function setHandStatus(connected){
 }
 
 function connectHandSocket(){
-  const addr = document.getElementById('handAddressInput').value.trim();
+  const addr = "10.90.83.13";
   if(!addr){ alert('Enter the hand ESP32\'s IP address (or mDNS hostname) first.'); return; }
 
   handWantConnected = true;
