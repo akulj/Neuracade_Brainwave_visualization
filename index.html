@@ -121,9 +121,67 @@
 <main>
 
   <!-- ============ INDIVIDUAL ============ -->
+<!-- ============ INDIVIDUAL ============ -->
   <div class="tabpanel active" id="panel-individual">
     <p class="hint">Each channel renders from its own ring buffer on a throttled draw loop, decoupled from the serial read loop — this is what keeps this tab smooth even while FFT/SFDR run in a background worker. Double-click a plot to export that channel's visible window as CSV.</p>
-    <div class="grid8" id="individualGrid"></div>
+    <div class="grid8" id="individualGrid">
+      <div class="card">
+        <h3>
+          <input class="chname" data-ch="0" value="CH1">
+          <span class="val" id="liveval-0">—</span>
+        </h3>
+        <div id="indiv-plot-0"></div>
+      </div>
+      <div class="card">
+        <h3>
+          <input class="chname" data-ch="1" value="CH2">
+          <span class="val" id="liveval-1">—</span>
+        </h3>
+        <div id="indiv-plot-1"></div>
+      </div>
+      <div class="card">
+        <h3>
+          <input class="chname" data-ch="2" value="CH3">
+          <span class="val" id="liveval-2">—</span>
+        </h3>
+        <div id="indiv-plot-2"></div>
+      </div>
+      <div class="card">
+        <h3>
+          <input class="chname" data-ch="3" value="CH4">
+          <span class="val" id="liveval-3">—</span>
+        </h3>
+        <div id="indiv-plot-3"></div>
+      </div>
+      <div class="card">
+        <h3>
+          <input class="chname" data-ch="4" value="CH5">
+          <span class="val" id="liveval-4">—</span>
+        </h3>
+        <div id="indiv-plot-4"></div>
+      </div>
+      <div class="card">
+        <h3>
+          <input class="chname" data-ch="5" value="CH6">
+          <span class="val" id="liveval-5">—</span>
+        </h3>
+        <div id="indiv-plot-5"></div>
+      </div>
+      <div class="card">
+        <h3>
+          <input class="chname" data-ch="6" value="CH7">
+          <span class="val" id="liveval-6">—</span>
+        </h3>
+        <div id="indiv-plot-6"></div>
+      </div>
+      <div class="card">
+        <h3>
+          <input class="chname" data-ch="7" value="CH8">
+          <span class="val" id="liveval-7">—</span>
+        </h3>
+        <div id="indiv-plot-7"></div>
+      </div>
+    </div>
   </div>
 
   <!-- ============ COMBINED ============ -->
