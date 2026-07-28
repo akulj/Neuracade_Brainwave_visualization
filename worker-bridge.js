@@ -82,7 +82,7 @@ function snapshotLast(ch, nSamples){
 }
 
 // ---------------- display buffers (reused, chronological) ----------------
-const displayBuffers = Array.from({length: CHANNELS}, () => new Float32Array(BUFFER_SIZE));
+let displayBuffers = Array.from({length: CHANNELS}, () => new Float32Array(BUFFER_SIZE));
 function updateDisplayBuffer(ch){ snapshotFull(ch, displayBuffers[ch]); }
 
 // ==================================================================
@@ -258,7 +258,7 @@ function buildIndividualGrid(){
     grid.appendChild(card);
 
     const holder = card.querySelector(`#indiv-plot-${c}`);
-    const width = Math.max(280, holder.clientWidth || 320);
+    const width = holder.clientWidth || holder.parentElement.clientWidth || 340;
     const chart = new uPlot(baseOpts(width, 140, {
       series: [ {}, { stroke: COLORS[c], width:1.5, points:{show:false} } ],
     }), [xData, displayBuffers[c]], holder);
@@ -343,7 +343,7 @@ function drawLoop(ts) {
       for (let c = 0; c < CHANNELS; c++) {
         updateDisplayBuffer(c);
         if (individualCharts[c]) {
-          individualCharts[c].setData(displayBuffers[c], false);
+          individualCharts[c].setData([xData, Array.from(displayBuffers[c])], false);
           individualCharts[c].redraw();
         }
       }
